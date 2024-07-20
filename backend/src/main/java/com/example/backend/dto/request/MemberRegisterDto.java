@@ -4,6 +4,7 @@ import com.example.backend.domain.Member;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import javax.validation.constraints.Email;
 import javax.validation.constraints.NotBlank;
@@ -20,6 +21,7 @@ public class MemberRegisterDto {
 
     @NotBlank
     @Size(min = 6, max = 8)
+    @Setter
     private String password;
 
     @NotBlank
@@ -55,20 +57,16 @@ public class MemberRegisterDto {
     }
 
 
-    public boolean isPasswordMatch() {
-        return this.password != null && this.password.equals(this.passwordCheck);
-    }
 
-
-    public Member toEntity() {
+    public static Member ofEntity(MemberRegisterDto dto) {
         return Member.builder()
-                .email(this.email)
-                .password(this.password)
-                .nickname(this.nickname)
-                .phone(this.phone)
-                .zonecode(this.zonecode)
-                .address(this.address)
-                .addressDetail(this.addressDetail)
+                .email(dto.getEmail())
+                .password(dto.getPassword())
+                .nickname(dto.getNickname())
+                .phone(dto.getPhone())
+                .zonecode(dto.getZonecode())
+                .address(dto.getAddress())
+                .addressDetail(dto.getAddressDetail())
                 .build();
     }
 }

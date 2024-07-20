@@ -3,12 +3,16 @@ package com.example.backend.service;
 import com.example.backend.domain.Member;
 import com.example.backend.dto.request.MemberRegisterDto;
 import com.example.backend.dto.response.MemberResponseDto;
-import com.example.backend.exception.DuplicateEmailException;
+import com.example.backend.exception.MemberException;
 import com.example.backend.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -18,40 +22,48 @@ public class MemberService {
     private final PasswordEncoder passwordEncoder;
 
     @Transactional
-    public MemberResponseDto register(MemberRegisterDto memberRegisterDto) {
-        // 비밀번호 일치 검사
-        if (!memberRegisterDto.isPasswordMatch()) {
-            throw new IllegalArgumentException("Passwords do not match");
-        }
+    public MemberResponseDto register(MemberRegisterDto registerDto) {
+        isExistUserEmail(registerDto.getEmail());
+        checkPassword(registerDto.getPassword(), registerDto.getPasswordCheck());
 
-        // 이메일 중복 검사
-        if (memberRepository.existsByEmail(memberRegisterDto.getEmail())) {
-            throw new DuplicateEmailException("Email is already in use");
-        }
+        // 패스워드 암호화
+        String encodePwd = passwordEncoder.encode(registerDto.getPassword());
+        registerDto.setPassword(encodePwd);
 
-        // 비밀번호 암호화
-        String encodedPassword = passwordEncoder.encode(memberRegisterDto.getPassword());
+        Member saveMember = memberRepository.save(
+                MemberRegisterDto.ofEntity(registerDto));
 
-        // Member 엔티티로 변환
-        Member member = Member.builder()
-                .email(memberRegisterDto.getEmail())
-                .password(encodedPassword) // 암호화된 비밀번호 설정
-                .nickname(memberRegisterDto.getNickname())
-                .phone(memberRegisterDto.getPhone())
-                .zonecode(memberRegisterDto.getZonecode())
-                .address(memberRegisterDto.getAddress())
-                .addressDetail(memberRegisterDto.getAddressDetail())
-                .build();
-
-        // 회원 저장
-        Member savedMember = memberRepository.save(member);
-
-        // MemberResponseDto로 변환하여 반환
-        return MemberResponseDto.fromEntity(savedMember);
+        return MemberResponseDto.fromEntity(saveMember);
     }
 
-    // 비밀번호 확인 메소드 (예를 들어, 로그인 시 사용)
-    public boolean validatePassword(Member member, String rawPassword) {
-        return passwordEncoder.matches(rawPassword, member.getPassword());
+    /**
+     * 아이디(이메일) 중복 체크
+     * @param email
+     */
+
+    private void isExistUserEmail(String email) {
+        if (memberRepository.findByEmail(email).isPresent()) {
+            throw new MemberException("이미 사용 중인 이메일입니다.", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    /**
+     * 비밀번호와 비밀번호 확인이 같은지 체크
+     * @param password
+     * @param passwordCheck
+     */
+    private void checkPassword(String password, String passwordCheck) {
+        if (!password.equals(passwordCheck)) {
+            throw new MemberException("패스워드 불일치", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+
+
+    public List<MemberResponseDto> getAllMembers() {
+        List<Member> members = memberRepository.findAll();
+        return members.stream()
+                .map(member -> new MemberResponseDto(member.getNickname(), member.getEmail(), member.getPhone()))
+                .collect(Collectors.toList());
     }
 }
